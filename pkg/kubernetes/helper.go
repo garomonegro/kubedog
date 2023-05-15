@@ -2,6 +2,7 @@ package kube
 
 import (
 	"context"
+	"fmt"
 
 	util "github.com/keikoproj/kubedog/internal/utilities"
 	"github.com/pkg/errors"
@@ -10,6 +11,7 @@ import (
 	networkingv1 "k8s.io/api/networking/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
+	"k8s.io/apimachinery/pkg/runtime/schema"
 )
 
 // ListPodsWithLabelSelector lists pods with a label selector
@@ -70,7 +72,18 @@ func (kc *Client) GetPersistentVolume(name string) (*corev1.PersistentVolume, er
 }
 
 func (kc *Client) ListInstanceGroups() (*unstructured.UnstructuredList, error) {
-	igs, err := kc.DynamicInterface.Resource(InstanceGroupResource).Namespace(InstanceGroupNamespace).List(context.Background(), metav1.ListOptions{})
+	const (
+		instanceGroupNamespace   = "instance-manager"
+		customResourceGroup      = "instancemgr"
+		customResourceAPIVersion = "v1alpha1"
+		customeResourceDomain    = "keikoproj.io"
+		customResourceKind       = "instancegroups"
+	)
+	var (
+		customResourceName    = fmt.Sprintf("%v.%v", customResourceGroup, customeResourceDomain)
+		instanceGroupResource = schema.GroupVersionResource{Group: customResourceName, Version: customResourceAPIVersion, Resource: customResourceKind}
+	)
+	igs, err := kc.DynamicInterface.Resource(instanceGroupResource).Namespace(instanceGroupNamespace).List(context.Background(), metav1.ListOptions{})
 	if err != nil {
 		return nil, err
 	}

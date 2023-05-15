@@ -43,6 +43,7 @@ import (
 	kTesting "k8s.io/client-go/testing"
 )
 
+// TODO: redistribute this test functions
 func TestPositiveNodesWithSelectorShouldBe(t *testing.T) {
 
 	var (
@@ -84,9 +85,9 @@ func TestPositiveNodesWithSelectorShouldBe(t *testing.T) {
 		FilesPath:          "../../test/templates",
 	}
 
-	err := kc.NodesWithSelectorShouldBe(1, testReadySelector, NodeStateReady)
+	err := kc.NodesWithSelectorShouldBe(1, testReadySelector, stateReady)
 	g.Expect(err).ShouldNot(gomega.HaveOccurred())
-	err = kc.NodesWithSelectorShouldBe(1, testFoundSelector, NodeStateFound)
+	err = kc.NodesWithSelectorShouldBe(1, testFoundSelector, stateFound)
 	g.Expect(err).ShouldNot(gomega.HaveOccurred())
 }
 
@@ -118,9 +119,9 @@ func TestPositiveResourceOperation(t *testing.T) {
 		FilesPath:          "../../test/templates",
 	}
 
-	err = kc.ResourceOperation(OperationCreate, fileName)
+	err = kc.ResourceOperation(operationCreate, fileName)
 	g.Expect(err).ShouldNot(gomega.HaveOccurred())
-	err = kc.ResourceOperation(OperationDelete, fileName)
+	err = kc.ResourceOperation(operationDelete, fileName)
 	g.Expect(err).ShouldNot(gomega.HaveOccurred())
 }
 func TestMultipleResourcesOperation(t *testing.T) {
@@ -231,7 +232,7 @@ func TestPositiveResourceShouldBe(t *testing.T) {
 		FilesPath:          "../../test/templates",
 	}
 
-	err = kc.ResourceShouldBe(fileName, StateCreated)
+	err = kc.ResourceShouldBe(fileName, stateCreated)
 	g.Expect(err).ShouldNot(gomega.HaveOccurred())
 
 	fakeDiscovery.ReactionChain[0] = &kTesting.SimpleReactor{
@@ -240,7 +241,7 @@ func TestPositiveResourceShouldBe(t *testing.T) {
 		Reaction: deletedReactionFunc,
 	}
 
-	err = kc.ResourceShouldBe(fileName, StateDeleted)
+	err = kc.ResourceShouldBe(fileName, stateDeleted)
 	g.Expect(err).ShouldNot(gomega.HaveOccurred())
 }
 
@@ -852,7 +853,7 @@ func Test_ThePodsInNamespaceWithSelectorShouldHaveLabels(t *testing.T) {
 				DynamicInterface:   tt.fields.DynamicInterface,
 				DiscoveryInterface: tt.fields.DiscoveryInterface,
 			}
-			if err := kc.ThePodsInNamespaceWithSelectorShouldHaveLabels(tt.args.namespace, tt.args.selector, tt.args.labels); (err != nil) != tt.wantErr {
+			if err := kc.PodsInNamespaceWithSelectorShouldHaveLabels(tt.args.namespace, tt.args.selector, tt.args.labels); (err != nil) != tt.wantErr {
 				t.Errorf("ThePodsInNamespaceWithSelectorShouldHaveLabels() error = %v, wantErr %v", err, tt.wantErr)
 			}
 		})
