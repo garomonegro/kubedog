@@ -13,6 +13,7 @@ import (
 	"k8s.io/client-go/tools/clientcmd"
 )
 
+// TODO: this moved to unstructured pkg, check what is still needed or not
 const (
 	operationCreate = "create"
 	operationSubmit = "submit"

@@ -1,4 +1,4 @@
-package kube
+package unstructured
 
 import (
 	"context"
@@ -18,83 +18,121 @@ import (
 	kerrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
+	"k8s.io/client-go/discovery"
+	"k8s.io/client-go/dynamic"
 )
 
-// TODO: maybe make this its own pkg and have them take the client as input?
-func (kc *ClientSet) ResourceOperation(operation, resourceFileName string) error {
-	return kc.ResourceOperationInNamespace(operation, resourceFileName, "")
+// TODO: seems not used, check and delete
+const (
+	operationCreate = "create"
+	operationSubmit = "submit"
+	operationUpdate = "update"
+	operationDelete = "delete"
+
+	stateCreated = "created"
+	stateDeleted = "deleted"
+	//stateUpgraded = "upgraded"
+	//stateReady = "ready"
+	//stateFound = "found"
+)
+
+type WaiterConfig struct {
+	tries    int
+	interval time.Duration
 }
 
-func (kc *ClientSet) ResourceOperationInNamespace(operation, resourceFileName, ns string) error {
-	unstructuredResource, err := kc.parseSingleResource(resourceFileName)
+func (w WaiterConfig) getInterval() time.Duration {
+	defaultWaiterInterval := time.Second * 30
+	if w.interval > 0 {
+		return w.interval
+	}
+	return defaultWaiterInterval
+}
+
+func (w WaiterConfig) getTries() int {
+	defaultWaiterTries := 40
+	if w.tries > 0 {
+		return w.tries
+	}
+	return defaultWaiterTries
+}
+
+//kc.TemplateArguments
+
+// TODO: maybe make this its own pkg and have them take the client as input?
+func ResourceOperation(dynamicClient dynamic.Interface, dc discovery.DiscoveryInterface, operation, resourceFilePath string) error {
+	return ResourceOperationInNamespace(dynamicClient, dc, operation, resourceFilePath, "")
+}
+
+// TODO: use unstructuredResourceOperation directly, call parseSingleResource from kube.go
+func ResourceOperationInNamespace(dynamicClient dynamic.Interface, dc discovery.DiscoveryInterface, unstructuredResource util.K8sUnstructuredResource, operation, ns, resourceFilePath string) error {
+	unstructuredResource, err := getResource(dc, resourceFilePath)
 	if err != nil {
 		return err
 	}
-	return kc.unstructuredResourceOperation(operation, ns, unstructuredResource)
+	return unstructuredResourceOperation(dynamicClient, operation, ns, unstructuredResource)
 }
 
-func (kc *ClientSet) parseSingleResource(resourceFileName string) (util.K8sUnstructuredResource, error) {
-	if err := kc.Validate(); err != nil {
-		return util.K8sUnstructuredResource{}, err
-	}
-
-	resourcePath := kc.getResourcePath(resourceFileName)
-	unstructuredResource, err := util.GetResourceFromYaml(resourcePath, kc.DiscoveryInterface, kc.TemplateArguments)
+func getResource(dc discovery.DiscoveryInterface, TemplateArguments interface{}, resourceFilePath string) (util.K8sUnstructuredResource, error) {
+	unstructuredResource, err := util.GetResourceFromYaml(resourceFilePath, dc, TemplateArguments)
 	if err != nil {
 		return util.K8sUnstructuredResource{}, err
 	}
-
 	return unstructuredResource, nil
 }
 
-func (kc *ClientSet) MultiResourceOperation(operation, resourceFileName string) error {
-	resourceList, err := kc.parseMultipleResources(resourceFileName)
-	if err != nil {
-		return err
-	}
-
-	for _, unstructuredResource := range resourceList {
-		err = kc.unstructuredResourceOperation(operation, "", unstructuredResource)
-		if err != nil {
-			return err
-		}
-	}
-
-	return nil
-}
-
-func (kc *ClientSet) MultiResourceOperationInNamespace(operation, resourceFileName, ns string) error {
-	resourceList, err := kc.parseMultipleResources(resourceFileName)
-	if err != nil {
-		return err
-	}
-
-	for _, unstructuredResource := range resourceList {
-		err = kc.unstructuredResourceOperation(operation, ns, unstructuredResource)
-		if err != nil {
-			return err
-		}
-	}
-
-	return nil
-}
-
-func (kc *ClientSet) parseMultipleResources(resourceFileName string) ([]util.K8sUnstructuredResource, error) {
-	if err := kc.Validate(); err != nil {
-		return nil, err
-	}
-
-	resourcePath := kc.getResourcePath(resourceFileName)
-
-	resourceList, err := util.GetMultipleResourcesFromYaml(resourcePath, kc.DiscoveryInterface, kc.TemplateArguments)
+func getResources(dc discovery.DiscoveryInterface, TemplateArguments interface{}, resourcesFilePath string) ([]util.K8sUnstructuredResource, error) {
+	resourceList, err := util.GetMultipleResourcesFromYaml(resourcesFilePath, dc, TemplateArguments)
 	if err != nil {
 		return nil, err
 	}
-
 	return resourceList, nil
 }
 
-func (kc *ClientSet) unstructuredResourceOperation(operation, ns string, unstructuredResource util.K8sUnstructuredResource) error {
+func validateDynamicClient(dynamicClient dynamic.Interface) error {
+	if dynamicClient == nil {
+		return errors.Errorf("'k8s.io/client-go/dynamic.Interface' is nil.")
+	}
+	return nil
+}
+
+func MultiResourceOperation(dynamicClient dynamic.Interface, dc discovery.DiscoveryInterface, operation, resourceFilePath string) error {
+	resourceList, err := getResources(dc, resourceFilePath)
+	if err != nil {
+		return err
+	}
+
+	for _, unstructuredResource := range resourceList {
+		err = unstructuredResourceOperation(dynamicClient, operation, "", unstructuredResource)
+		if err != nil {
+			return err
+		}
+	}
+
+	return nil
+}
+
+func MultiResourceOperationInNamespace(dynamicClient dynamic.Interface, dc discovery.DiscoveryInterface, operation, resourceFilePath, ns string) error {
+	resourceList, err := getResources(dc, resourceFilePath)
+	if err != nil {
+		return err
+	}
+
+	for _, unstructuredResource := range resourceList {
+		err = unstructuredResourceOperation(dynamicClient, operation, ns, unstructuredResource)
+		if err != nil {
+			return err
+		}
+	}
+
+	return nil
+}
+
+func unstructuredResourceOperation(dynamicClient dynamic.Interface, operation, ns string, unstructuredResource util.K8sUnstructuredResource) error {
+	if err := validateDynamicClient(dynamicClient); err != nil {
+		return err
+	}
+
 	gvr, resource := unstructuredResource.GVR, unstructuredResource.Resource
 
 	if ns == "" {
@@ -103,7 +141,7 @@ func (kc *ClientSet) unstructuredResourceOperation(operation, ns string, unstruc
 
 	switch operation {
 	case operationCreate, operationSubmit:
-		_, err := kc.DynamicInterface.Resource(gvr.Resource).Namespace(ns).Create(context.Background(), resource, metav1.CreateOptions{})
+		_, err := dynamicClient.Resource(gvr.Resource).Namespace(ns).Create(context.Background(), resource, metav1.CreateOptions{})
 		if err != nil {
 			if kerrors.IsAlreadyExists(err) {
 				log.Infof("%s %s already created", resource.GetKind(), resource.GetName())
@@ -113,20 +151,20 @@ func (kc *ClientSet) unstructuredResourceOperation(operation, ns string, unstruc
 		}
 		log.Infof("%s %s has been created in namespace %s", resource.GetKind(), resource.GetName(), ns)
 	case operationUpdate:
-		currentResourceVersion, err := kc.DynamicInterface.Resource(gvr.Resource).Namespace(ns).Get(context.Background(), resource.GetName(), metav1.GetOptions{})
+		currentResourceVersion, err := dynamicClient.Resource(gvr.Resource).Namespace(ns).Get(context.Background(), resource.GetName(), metav1.GetOptions{})
 		if err != nil {
 			return err
 		}
 
 		resource.SetResourceVersion(currentResourceVersion.DeepCopy().GetResourceVersion())
 
-		_, err = kc.DynamicInterface.Resource(gvr.Resource).Namespace(ns).Update(context.Background(), resource, metav1.UpdateOptions{})
+		_, err = dynamicClient.Resource(gvr.Resource).Namespace(ns).Update(context.Background(), resource, metav1.UpdateOptions{})
 		if err != nil {
 			return err
 		}
 		log.Infof("%s %s has been updated in namespace %s", resource.GetKind(), resource.GetName(), ns)
 	case operationDelete:
-		err := kc.DynamicInterface.Resource(gvr.Resource).Namespace(ns).Delete(context.Background(), resource.GetName(), metav1.DeleteOptions{})
+		err := dynamicClient.Resource(gvr.Resource).Namespace(ns).Delete(context.Background(), resource.GetName(), metav1.DeleteOptions{})
 		if err != nil {
 			if kerrors.IsNotFound(err) {
 				log.Infof("%s %s already deleted", resource.GetKind(), resource.GetName())
@@ -141,46 +179,44 @@ func (kc *ClientSet) unstructuredResourceOperation(operation, ns string, unstruc
 	return nil
 }
 
-func (kc *ClientSet) ResourceOperationWithResult(operation, resourceFileName, expectedResult string) error {
-	return kc.ResourceOperationWithResultInNamespace(operation, resourceFileName, "", expectedResult)
+func ResourceOperationWithResult(dynamicClient dynamic.Interface, dc discovery.DiscoveryInterface, operation, resourceFilePath, expectedResult string) error {
+	return ResourceOperationWithResultInNamespace(dynamicClient, dc, operation, resourceFilePath, "", expectedResult)
 }
 
-func (kc *ClientSet) ResourceOperationWithResultInNamespace(operation, resourceFileName, namespace, expectedResult string) error {
+func ResourceOperationWithResultInNamespace(dynamicClient dynamic.Interface, dc discovery.DiscoveryInterface, operation, resourceFilePath, namespace, expectedResult string) error {
 	var expectError = strings.EqualFold(expectedResult, "fail")
-	err := kc.ResourceOperationInNamespace(operation, resourceFileName, namespace)
+	err := ResourceOperationInNamespace(dynamicClient, dc, operation, resourceFilePath, namespace)
 	if !expectError && err != nil {
-		return fmt.Errorf("unexpected error when %s %s: %s", operation, resourceFileName, err.Error())
+		return fmt.Errorf("unexpected error when '%s' '%s': '%s'", operation, resourceFilePath, err.Error())
 	} else if expectError && err == nil {
-		return fmt.Errorf("expected error when %s %s, but received none", operation, resourceFileName)
+		return fmt.Errorf("expected error when '%s' '%s', but received none", operation, resourceFilePath)
 	}
 	return nil
 }
 
-func (kc *ClientSet) ResourceShouldBe(resourceFileName, state string) error {
+func ResourceShouldBe(dynamicClient dynamic.Interface, dc discovery.DiscoveryInterface, w WaiterConfig, resourceFilePath, state string) error {
 	var (
 		exists  bool
 		counter int
 	)
 
-	if err := kc.Validate(); err != nil {
+	if err := validateDynamicClient(dynamicClient); err != nil {
 		return err
 	}
 
-	resourcePath := kc.getResourcePath(resourceFileName)
-
-	unstructuredResource, err := util.GetResourceFromYaml(resourcePath, kc.DiscoveryInterface, kc.TemplateArguments)
+	unstructuredResource, err := getResource(dc, resourceFilePath)
 	if err != nil {
 		return err
 	}
 	gvr, resource := unstructuredResource.GVR, unstructuredResource.Resource
 	for {
 		exists = true
-		if counter >= kc.getWaiterTries() {
+		if counter >= w.getTries() {
 			return errors.New("waiter timed out waiting for resource state")
 		}
 		log.Infof("[KUBEDOG] waiting for resource %v/%v to become %v", resource.GetNamespace(), resource.GetName(), state)
 
-		_, err := kc.DynamicInterface.Resource(gvr.Resource).Namespace(resource.GetNamespace()).Get(context.Background(), resource.GetName(), metav1.GetOptions{})
+		_, err := dynamicClient.Resource(gvr.Resource).Namespace(resource.GetNamespace()).Get(context.Background(), resource.GetName(), metav1.GetOptions{})
 		if err != nil {
 			if !kerrors.IsNotFound(err) {
 				return err
@@ -202,14 +238,14 @@ func (kc *ClientSet) ResourceShouldBe(resourceFileName, state string) error {
 			}
 		}
 		counter++
-		time.Sleep(kc.getWaiterInterval())
+		time.Sleep(w.getInterval())
 	}
 }
 
-func (kc *ClientSet) ResourceShouldConvergeToSelector(resourceFileName, selector string) error {
+func ResourceShouldConvergeToSelector(dynamicClient dynamic.Interface, dc discovery.DiscoveryInterface, w WaiterConfig, resourceFilePath, selector string) error {
 	var counter int
 
-	if err := kc.Validate(); err != nil {
+	if err := validateDynamicClient(dynamicClient); err != nil {
 		return err
 	}
 
@@ -226,21 +262,19 @@ func (kc *ClientSet) ResourceShouldConvergeToSelector(resourceFileName, selector
 		return errors.Errorf("Found empty 'key' in selector '%s' of form '<key>=<value>'", selector)
 	}
 
-	resourcePath := kc.getResourcePath(resourceFileName)
-
-	unstructuredResource, err := util.GetResourceFromYaml(resourcePath, kc.DiscoveryInterface, kc.TemplateArguments)
+	unstructuredResource, err := getResource(dc, resourceFilePath)
 	if err != nil {
 		return err
 	}
 	gvr, resource := unstructuredResource.GVR, unstructuredResource.Resource
 
 	for {
-		if counter >= kc.getWaiterTries() {
+		if counter >= w.getTries() {
 			return errors.New("waiter timed out waiting for resource")
 		}
 		//TODO: configure the logger to output "[KUBEDOG]" instead typing it in each log
 		log.Infof("[KUBEDOG] waiting for resource %v/%v to converge to %v=%v", resource.GetNamespace(), resource.GetName(), key, value)
-		cr, err := kc.DynamicInterface.Resource(gvr.Resource).Namespace(resource.GetNamespace()).Get(context.Background(), resource.GetName(), metav1.GetOptions{})
+		cr, err := dynamicClient.Resource(gvr.Resource).Namespace(resource.GetNamespace()).Get(context.Background(), resource.GetName(), metav1.GetOptions{})
 		if err != nil {
 			return err
 		}
@@ -254,35 +288,34 @@ func (kc *ClientSet) ResourceShouldConvergeToSelector(resourceFileName, selector
 			}
 		}
 		counter++
-		time.Sleep(kc.getWaiterInterval())
+		time.Sleep(w.getInterval())
 	}
 
 	return nil
 }
 
-func (kc *ClientSet) ResourceConditionShouldBe(resourceFileName, cType, status string) error {
+func ResourceConditionShouldBe(dynamicClient dynamic.Interface, dc discovery.DiscoveryInterface, w WaiterConfig, resourceFilePath, cType, status string) error {
 	var (
 		counter        int
 		expectedStatus = cases.Title(language.English).String(status)
 	)
 
-	if err := kc.Validate(); err != nil {
+	if err := validateDynamicClient(dynamicClient); err != nil {
 		return err
 	}
 
-	resourcePath := kc.getResourcePath(resourceFileName)
-	unstructuredResource, err := util.GetResourceFromYaml(resourcePath, kc.DiscoveryInterface, kc.TemplateArguments)
+	unstructuredResource, err := getResource(dc, resourceFilePath)
 	if err != nil {
 		return err
 	}
 	gvr, resource := unstructuredResource.GVR, unstructuredResource.Resource
 
 	for {
-		if counter >= kc.getWaiterTries() {
+		if counter >= w.getTries() {
 			return errors.New("waiter timed out waiting for resource state")
 		}
 		log.Infof("[KUBEDOG] waiting for resource %v/%v to meet condition %v=%v", resource.GetNamespace(), resource.GetName(), cType, expectedStatus)
-		cr, err := kc.DynamicInterface.Resource(gvr.Resource).Namespace(resource.GetNamespace()).Get(context.Background(), resource.GetName(), metav1.GetOptions{})
+		cr, err := dynamicClient.Resource(gvr.Resource).Namespace(resource.GetNamespace()).Get(context.Background(), resource.GetName(), metav1.GetOptions{})
 		if err != nil {
 			return err
 		}
@@ -314,11 +347,11 @@ func (kc *ClientSet) ResourceConditionShouldBe(resourceFileName, cType, status s
 			}
 		}
 		counter++
-		time.Sleep(kc.getWaiterInterval())
+		time.Sleep(w.getInterval())
 	}
 }
 
-func (kc *ClientSet) UpdateResourceWithField(resourceFileName, key string, value string) error {
+func UpdateResourceWithField(dynamicClient dynamic.Interface, dc discovery.DiscoveryInterface, resourceFilePath, key string, value string) error {
 	var (
 		keySlice     = util.DeleteEmpty(strings.Split(key, "."))
 		overrideType bool
@@ -326,12 +359,11 @@ func (kc *ClientSet) UpdateResourceWithField(resourceFileName, key string, value
 		//err          error
 	)
 
-	if err := kc.Validate(); err != nil {
+	if err := validateDynamicClient(dynamicClient); err != nil {
 		return err
 	}
 
-	resourcePath := kc.getResourcePath(resourceFileName)
-	unstructuredResource, err := util.GetResourceFromYaml(resourcePath, kc.DiscoveryInterface, kc.TemplateArguments)
+	unstructuredResource, err := getResource(dc, resourceFilePath)
 	if err != nil {
 		return err
 	}
@@ -343,7 +375,7 @@ func (kc *ClientSet) UpdateResourceWithField(resourceFileName, key string, value
 		intValue = n
 	}
 
-	updateTarget, err := kc.DynamicInterface.Resource(gvr.Resource).Namespace(resource.GetNamespace()).Get(context.Background(), resource.GetName(), metav1.GetOptions{})
+	updateTarget, err := dynamicClient.Resource(gvr.Resource).Namespace(resource.GetNamespace()).Get(context.Background(), resource.GetName(), metav1.GetOptions{})
 	if err != nil {
 		return err
 	}
@@ -359,20 +391,16 @@ func (kc *ClientSet) UpdateResourceWithField(resourceFileName, key string, value
 		}
 	}
 
-	_, err = kc.DynamicInterface.Resource(gvr.Resource).Namespace(resource.GetNamespace()).Update(context.Background(), updateTarget, metav1.UpdateOptions{})
+	_, err = dynamicClient.Resource(gvr.Resource).Namespace(resource.GetNamespace()).Update(context.Background(), updateTarget, metav1.UpdateOptions{})
 	if err != nil {
 		return err
 	}
-	time.Sleep(kc.getWaiterInterval())
 	return nil
 }
 
-func (kc *ClientSet) DeleteResourcesAtPath(resourcesPath string) error {
-
-	// Getting context
-	err := kc.DiscoverClients()
-	if err != nil {
-		return errors.Errorf("Failed getting the kubernetes client: %v", err)
+func DeleteResourcesAtPath(dynamicClient dynamic.Interface, dc discovery.DiscoveryInterface, w WaiterConfig, resourcesPath string) error {
+	if err := validateDynamicClient(dynamicClient); err != nil {
+		return err
 	}
 
 	var deleteFn = func(path string, info os.FileInfo, walkErr error) error {
@@ -384,13 +412,13 @@ func (kc *ClientSet) DeleteResourcesAtPath(resourcesPath string) error {
 			return nil
 		}
 
-		unstructuredResource, err := util.GetResourceFromYaml(path, kc.DiscoveryInterface, kc.TemplateArguments)
+		unstructuredResource, err := getResource(dc, path)
 		if err != nil {
 			return err
 		}
 		gvr, resource := unstructuredResource.GVR, unstructuredResource.Resource
 
-		err = kc.DynamicInterface.Resource(gvr.Resource).Namespace(resource.GetNamespace()).Delete(context.Background(), resource.GetName(), metav1.DeleteOptions{})
+		err = dynamicClient.Resource(gvr.Resource).Namespace(resource.GetNamespace()).Delete(context.Background(), resource.GetName(), metav1.DeleteOptions{})
 		if err != nil {
 			return err
 		}
@@ -411,18 +439,18 @@ func (kc *ClientSet) DeleteResourcesAtPath(resourcesPath string) error {
 			return nil
 		}
 
-		unstructuredResource, err := util.GetResourceFromYaml(path, kc.DiscoveryInterface, kc.TemplateArguments)
+		unstructuredResource, err := getResource(dc, path)
 		if err != nil {
 			return err
 		}
 		gvr, resource := unstructuredResource.GVR, unstructuredResource.Resource
 
 		for {
-			if counter >= kc.getWaiterTries() {
+			if counter >= w.getTries() {
 				return errors.New("waiter timed out waiting for deletion")
 			}
 			log.Infof("[KUBEDOG] waiting for resource deletion of %v/%v", resource.GetNamespace(), resource.GetName())
-			_, err := kc.DynamicInterface.Resource(gvr.Resource).Namespace(resource.GetNamespace()).Get(context.Background(), resource.GetName(), metav1.GetOptions{})
+			_, err := dynamicClient.Resource(gvr.Resource).Namespace(resource.GetNamespace()).Get(context.Background(), resource.GetName(), metav1.GetOptions{})
 			if err != nil {
 				if kerrors.IsNotFound(err) {
 					log.Infof("[KUBEDOG] resource %v/%v is deleted", resource.GetNamespace(), resource.GetName())
@@ -430,7 +458,7 @@ func (kc *ClientSet) DeleteResourcesAtPath(resourcesPath string) error {
 				}
 			}
 			counter++
-			time.Sleep(kc.getWaiterInterval())
+			time.Sleep(w.getInterval())
 		}
 		return nil
 	}
