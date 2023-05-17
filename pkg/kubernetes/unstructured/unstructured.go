@@ -64,7 +64,7 @@ func ResourceOperation(dynamicClient dynamic.Interface, unstructuredResource uti
 	return ResourceOperationInNamespace(dynamicClient, unstructuredResource, operation, "")
 }
 
-func getResource(dc discovery.DiscoveryInterface, TemplateArguments interface{}, resourceFilePath string) (util.K8sUnstructuredResource, error) {
+func GetResource(dc discovery.DiscoveryInterface, TemplateArguments interface{}, resourceFilePath string) (util.K8sUnstructuredResource, error) {
 	unstructuredResource, err := util.GetResourceFromYaml(resourceFilePath, dc, TemplateArguments)
 	if err != nil {
 		return util.K8sUnstructuredResource{}, err
@@ -72,7 +72,7 @@ func getResource(dc discovery.DiscoveryInterface, TemplateArguments interface{},
 	return unstructuredResource, nil
 }
 
-func getResources(dc discovery.DiscoveryInterface, TemplateArguments interface{}, resourcesFilePath string) ([]util.K8sUnstructuredResource, error) {
+func GetResources(dc discovery.DiscoveryInterface, TemplateArguments interface{}, resourcesFilePath string) ([]util.K8sUnstructuredResource, error) {
 	resourceList, err := util.GetMultipleResourcesFromYaml(resourcesFilePath, dc, TemplateArguments)
 	if err != nil {
 		return nil, err
@@ -377,7 +377,7 @@ func DeleteResourcesAtPath(dynamicClient dynamic.Interface, dc discovery.Discove
 			return nil
 		}
 
-		unstructuredResource, err := getResource(dc, TemplateArguments, path)
+		unstructuredResource, err := GetResource(dc, TemplateArguments, path)
 		if err != nil {
 			return err
 		}
@@ -404,7 +404,7 @@ func DeleteResourcesAtPath(dynamicClient dynamic.Interface, dc discovery.Discove
 			return nil
 		}
 
-		unstructuredResource, err := getResource(dc, TemplateArguments, path)
+		unstructuredResource, err := GetResource(dc, TemplateArguments, path)
 		if err != nil {
 			return err
 		}

@@ -21,15 +21,17 @@ import (
 
 	util "github.com/keikoproj/kubedog/internal/utilities"
 	"github.com/onsi/gomega"
+	log "github.com/sirupsen/logrus"
 	kerrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/meta"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
+	serializer "k8s.io/apimachinery/pkg/runtime/serializer/yaml"
 	fakeDiscovery "k8s.io/client-go/discovery/fake"
 	"k8s.io/client-go/dynamic"
 	fakeDynamic "k8s.io/client-go/dynamic/fake"
-	"k8s.io/client-go/kubernetes/fake"
 	kTesting "k8s.io/client-go/testing"
 )
 
@@ -41,7 +43,7 @@ func TestPositiveResourceOperation(t *testing.T) {
 		fakeDynamicClient = fakeDynamic.NewSimpleDynamicClient(dynScheme)
 		testResource      *unstructured.Unstructured
 		fakeDiscovery     = fakeDiscovery.FakeDiscovery{}
-		fakeClient        *fake.Clientset
+		//fakeClient        *fake.Clientset
 	)
 
 	const fileName = "test-resourcefile.yaml"
@@ -54,27 +56,28 @@ func TestPositiveResourceOperation(t *testing.T) {
 	fakeDiscovery.Fake = &fakeDynamicClient.Fake
 	fakeDiscovery.Resources = append(fakeDiscovery.Resources, newTestAPIResourceList(testResource.GetAPIVersion(), testResource.GetName(), testResource.GetKind()))
 
-	kc := ClientSet{
-		KubeInterface:      fakeClient,
-		DynamicInterface:   fakeDynamicClient,
-		DiscoveryInterface: &fakeDiscovery,
-		FilesPath:          "../../test/templates",
-	}
-
-	err = kc.ResourceOperation(operationCreate, fileName)
+	// kc := ClientSet{
+	// 	KubeInterface:      fakeClient,
+	// 	DynamicInterface:   fakeDynamicClient,
+	// 	DiscoveryInterface: &fakeDiscovery,
+	// 	FilesPath:          "../../test/templates",
+	// }
+	resource, err := GetResource(&fakeDiscovery, nil, resourcePath(fileName))
 	g.Expect(err).ShouldNot(gomega.HaveOccurred())
-	err = kc.ResourceOperation(operationDelete, fileName)
+	err = ResourceOperation(fakeDynamicClient, resource, operationCreate)
+	g.Expect(err).ShouldNot(gomega.HaveOccurred())
+	err = ResourceOperation(fakeDynamicClient, resource, operationDelete)
 	g.Expect(err).ShouldNot(gomega.HaveOccurred())
 }
 
 func TestPositiveResourceShouldBe(t *testing.T) {
 	var (
-		err                 error
-		g                   = gomega.NewWithT(t)
-		dynScheme           = runtime.NewScheme()
-		fakeDynamicClient   = fakeDynamic.NewSimpleDynamicClient(dynScheme)
-		fakeDiscovery       = fakeDiscovery.FakeDiscovery{}
-		fakeClient          *fake.Clientset
+		err               error
+		g                 = gomega.NewWithT(t)
+		dynScheme         = runtime.NewScheme()
+		fakeDynamicClient = fakeDynamic.NewSimpleDynamicClient(dynScheme)
+		fakeDiscovery     = fakeDiscovery.FakeDiscovery{}
+		//fakeClient          *fake.Clientset
 		testResource        *unstructured.Unstructured
 		createdReactionFunc = func(action kTesting.Action) (handled bool, ret runtime.Object, err error) {
 			return true, testResource, nil
@@ -96,14 +99,15 @@ func TestPositiveResourceShouldBe(t *testing.T) {
 
 	fakeDynamicClient.PrependReactor("get", "someResource", createdReactionFunc)
 
-	kc := ClientSet{
-		DynamicInterface:   fakeDynamicClient,
-		DiscoveryInterface: &fakeDiscovery,
-		KubeInterface:      fakeClient,
-		FilesPath:          "../../test/templates",
-	}
-
-	err = kc.ResourceShouldBe(fileName, stateCreated)
+	// kc := ClientSet{
+	// 	DynamicInterface:   fakeDynamicClient,
+	// 	DiscoveryInterface: &fakeDiscovery,
+	// 	KubeInterface:      fakeClient,
+	// 	FilesPath:          "../../test/templates",
+	// }
+	resource, err := GetResource(&fakeDiscovery, nil, resourcePath(fileName))
+	g.Expect(err).ShouldNot(gomega.HaveOccurred())
+	err = ResourceShouldBe(fakeDynamicClient, resource, WaiterConfig{}, stateCreated)
 	g.Expect(err).ShouldNot(gomega.HaveOccurred())
 
 	fakeDiscovery.ReactionChain[0] = &kTesting.SimpleReactor{
@@ -112,7 +116,7 @@ func TestPositiveResourceShouldBe(t *testing.T) {
 		Reaction: deletedReactionFunc,
 	}
 
-	err = kc.ResourceShouldBe(fileName, stateDeleted)
+	err = ResourceShouldBe(fakeDynamicClient, resource, WaiterConfig{}, stateDeleted)
 	g.Expect(err).ShouldNot(gomega.HaveOccurred())
 }
 
@@ -123,9 +127,9 @@ func TestPositiveResourceShouldConvergeToSelector(t *testing.T) {
 		g                 = gomega.NewWithT(t)
 		fakeDynamicClient = fakeDynamic.NewSimpleDynamicClient(runtime.NewScheme())
 		fakeDiscovery     = fakeDiscovery.FakeDiscovery{}
-		fakeClient        *fake.Clientset
-		testResource      *unstructured.Unstructured
-		getReactionFunc   = func(action kTesting.Action) (handled bool, ret runtime.Object, err error) {
+		//fakeClient        *fake.Clientset
+		testResource    *unstructured.Unstructured
+		getReactionFunc = func(action kTesting.Action) (handled bool, ret runtime.Object, err error) {
 			return true, testResource, nil
 		}
 	)
@@ -145,14 +149,15 @@ func TestPositiveResourceShouldConvergeToSelector(t *testing.T) {
 
 	fakeDynamicClient.PrependReactor("get", "someResource", getReactionFunc)
 
-	kc := ClientSet{
-		DynamicInterface:   fakeDynamicClient,
-		DiscoveryInterface: &fakeDiscovery,
-		KubeInterface:      fakeClient,
-		FilesPath:          "../../test/templates",
-	}
-
-	err = kc.ResourceShouldConvergeToSelector(fileName, selector)
+	// kc := ClientSet{
+	// 	DynamicInterface:   fakeDynamicClient,
+	// 	DiscoveryInterface: &fakeDiscovery,
+	// 	KubeInterface:      fakeClient,
+	// 	FilesPath:          "../../test/templates",
+	// }
+	resource, err := GetResource(&fakeDiscovery, nil, resourcePath(fileName))
+	g.Expect(err).ShouldNot(gomega.HaveOccurred())
+	err = ResourceShouldConvergeToSelector(fakeDynamicClient, resource, WaiterConfig{}, selector)
 	g.Expect(err).ShouldNot(gomega.HaveOccurred())
 }
 
@@ -163,9 +168,9 @@ func TestPositiveResourceConditionShouldBe(t *testing.T) {
 		g                 = gomega.NewWithT(t)
 		fakeDynamicClient = fakeDynamic.NewSimpleDynamicClient(runtime.NewScheme())
 		fakeDiscovery     = fakeDiscovery.FakeDiscovery{}
-		fakeClient        *fake.Clientset
-		testResource      *unstructured.Unstructured
-		getReactionFunc   = func(action kTesting.Action) (handled bool, ret runtime.Object, err error) {
+		//fakeClient        *fake.Clientset
+		testResource    *unstructured.Unstructured
+		getReactionFunc = func(action kTesting.Action) (handled bool, ret runtime.Object, err error) {
 			return true, testResource, nil
 		}
 	)
@@ -186,14 +191,15 @@ func TestPositiveResourceConditionShouldBe(t *testing.T) {
 
 	fakeDynamicClient.PrependReactor("get", "someResource", getReactionFunc)
 
-	kc := ClientSet{
-		DynamicInterface:   fakeDynamicClient,
-		DiscoveryInterface: &fakeDiscovery,
-		KubeInterface:      fakeClient,
-		FilesPath:          "../../test/templates",
-	}
-
-	err = kc.ResourceConditionShouldBe(fileName, testConditionType, testConditionStatus)
+	// kc := ClientSet{
+	// 	DynamicInterface:   fakeDynamicClient,
+	// 	DiscoveryInterface: &fakeDiscovery,
+	// 	KubeInterface:      fakeClient,
+	// 	FilesPath:          "../../test/templates",
+	// }
+	resource, err := GetResource(&fakeDiscovery, nil, resourcePath(fileName))
+	g.Expect(err).ShouldNot(gomega.HaveOccurred())
+	err = ResourceConditionShouldBe(fakeDynamicClient, resource, WaiterConfig{}, testConditionType, testConditionStatus)
 	g.Expect(err).ShouldNot(gomega.HaveOccurred())
 }
 
@@ -211,9 +217,9 @@ func TestPositiveUpdateResourceWithField(t *testing.T) {
 		g                 = gomega.NewWithT(t)
 		fakeDynamicClient = fakeDynamic.NewSimpleDynamicClient(runtime.NewScheme())
 		fakeDiscovery     = fakeDiscovery.FakeDiscovery{}
-		fakeClient        *fake.Clientset
-		testResource      *unstructured.Unstructured
-		getReactionFunc   = func(action kTesting.Action) (handled bool, ret runtime.Object, err error) {
+		//fakeClient        *fake.Clientset
+		testResource    *unstructured.Unstructured
+		getReactionFunc = func(action kTesting.Action) (handled bool, ret runtime.Object, err error) {
 			return true, testResource, nil
 		}
 		updateReactionFunc = func(action kTesting.Action) (handled bool, ret runtime.Object, err error) {
@@ -233,14 +239,15 @@ func TestPositiveUpdateResourceWithField(t *testing.T) {
 	fakeDynamicClient.PrependReactor("get", "someResource", getReactionFunc)
 	fakeDynamicClient.PrependReactor("update", "someResource", updateReactionFunc)
 
-	kc := ClientSet{
-		DynamicInterface:   fakeDynamicClient,
-		DiscoveryInterface: &fakeDiscovery,
-		KubeInterface:      fakeClient,
-		FilesPath:          "../../test/templates",
-	}
-
-	err = kc.UpdateResourceWithField(fileName, testUpdateKeyChain, testUpdateValue)
+	// kc := ClientSet{
+	// 	DynamicInterface:   fakeDynamicClient,
+	// 	DiscoveryInterface: &fakeDiscovery,
+	// 	KubeInterface:      fakeClient,
+	// 	FilesPath:          "../../test/templates",
+	// }
+	resource, err := GetResource(&fakeDiscovery, nil, resourcePath(fileName))
+	g.Expect(err).ShouldNot(gomega.HaveOccurred())
+	err = UpdateResourceWithField(fakeDynamicClient, resource, testUpdateKeyChain, testUpdateValue)
 	g.Expect(err).ShouldNot(gomega.HaveOccurred())
 
 	expectedLabelValue, found, err := unstructured.NestedString(testResource.UnstructuredContent(), "metadata", "labels", "testUpdateKey")
@@ -249,7 +256,7 @@ func TestPositiveUpdateResourceWithField(t *testing.T) {
 	g.Expect(expectedLabelValue).To(gomega.Equal(testUpdateValue))
 }
 
-func Test_unstructuredResourceOperation(t *testing.T) {
+func TestResourceOperationInNamespace(t *testing.T) {
 	type clientFields struct {
 		DynamicInterface dynamic.Interface
 	}
@@ -393,20 +400,23 @@ func Test_unstructuredResourceOperation(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			kc := &ClientSet{
-				DynamicInterface: tt.clientFields.DynamicInterface,
-			}
-			if err := kc.unstructuredResourceOperation(tt.funcArgs.operation, tt.funcArgs.ns, tt.funcArgs.unstructuredResource); (err != nil) != tt.wantErr {
+			// kc := &ClientSet{
+			// 	DynamicInterface: tt.clientFields.DynamicInterface,
+			// }
+			if err := ResourceOperationInNamespace(tt.clientFields.DynamicInterface, tt.funcArgs.unstructuredResource, tt.funcArgs.operation, tt.funcArgs.ns); (err != nil) != tt.wantErr {
 				t.Errorf("ClientSet.unstructuredResourceOperation() error = %v, wantErr %v", err, tt.wantErr)
 			}
 		})
 	}
 }
 
+func resourcePath(resourceFileName string) string {
+	return filepath.Join("../../test/templates", resourceFileName)
+}
+
 // TODO: do not return error, receive t *testing.T and fail instead
 func resourceFromYaml(resourceFileName string) (*unstructured.Unstructured, error) {
-
-	resourcePath := filepath.Join("../../test/templates", resourceFileName)
+	resourcePath := resourcePath(resourceFileName)
 	d, err := ioutil.ReadFile(resourcePath)
 	if err != nil {
 		return nil, err
@@ -424,4 +434,30 @@ func resourceFromBytes(bytes []byte) (*unstructured.Unstructured, error) {
 	}
 
 	return resource, nil
+}
+
+// TODO: this is implemented twice, maybe have a test helper pkg?
+func newTestAPIResourceList(apiVersion, name, kind string) *metav1.APIResourceList {
+	return &metav1.APIResourceList{
+		GroupVersion: apiVersion,
+		APIResources: []metav1.APIResource{
+			{
+				Name:       name,
+				Kind:       kind,
+				Namespaced: true,
+			},
+		},
+	}
+}
+
+// TODO: do not log error, receive t *testing.T and fail instead
+func addLabel(in *unstructured.Unstructured, key, value string) {
+	labels, _, _ := unstructured.NestedMap(in.Object, "metadata", "labels")
+
+	labels[key] = value
+
+	err := unstructured.SetNestedMap(in.Object, labels, "metadata", "labels")
+	if err != nil {
+		log.Errorf("Failed adding label %v=%v to the resource %v: %v", key, value, in.GetName(), err)
+	}
 }

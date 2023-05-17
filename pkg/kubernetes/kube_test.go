@@ -21,7 +21,6 @@ import (
 
 	util "github.com/keikoproj/kubedog/internal/utilities"
 	"github.com/onsi/gomega"
-	log "github.com/sirupsen/logrus"
 	appsv1 "k8s.io/api/apps/v1"
 	hpa "k8s.io/api/autoscaling/v2beta2"
 	v1 "k8s.io/api/core/v1"
@@ -285,6 +284,7 @@ func TestScaleDeployment(t *testing.T) {
 	g.Expect(s.Spec.Replicas).To(gomega.Equal(int32(2)))
 }
 
+// TODO: this is implemented twice, maybe have a test helper pkg?
 func newTestAPIResourceList(apiVersion, name, kind string) *metav1.APIResourceList {
 	return &metav1.APIResourceList{
 		GroupVersion: apiVersion,
@@ -295,17 +295,6 @@ func newTestAPIResourceList(apiVersion, name, kind string) *metav1.APIResourceLi
 				Namespaced: true,
 			},
 		},
-	}
-}
-
-func addLabel(in *unstructured.Unstructured, key, value string) {
-	labels, _, _ := unstructured.NestedMap(in.Object, "metadata", "labels")
-
-	labels[key] = value
-
-	err := unstructured.SetNestedMap(in.Object, labels, "metadata", "labels")
-	if err != nil {
-		log.Errorf("Failed adding label %v=%v to the resource %v: %v", key, value, in.GetName(), err)
 	}
 }
 
