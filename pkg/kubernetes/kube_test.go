@@ -16,7 +16,6 @@ package kube
 
 import (
 	"context"
-	"io/ioutil"
 	"path/filepath"
 	"testing"
 
@@ -31,7 +30,6 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime"
-	serializer "k8s.io/apimachinery/pkg/runtime/serializer/yaml"
 	fakeDiscovery "k8s.io/client-go/discovery/fake"
 	"k8s.io/client-go/dynamic"
 	fakeDynamic "k8s.io/client-go/dynamic/fake"
@@ -285,27 +283,6 @@ func TestScaleDeployment(t *testing.T) {
 	g.Expect(err).ShouldNot(gomega.HaveOccurred())
 	s, _ := kc.KubeInterface.AppsV1().Deployments(namespace).GetScale(context.Background(), deployName, metav1.GetOptions{})
 	g.Expect(s.Spec.Replicas).To(gomega.Equal(int32(2)))
-}
-
-func resourceFromYaml(resourceFileName string) (*unstructured.Unstructured, error) {
-
-	resourcePath := filepath.Join("../../test/templates", resourceFileName)
-	d, err := ioutil.ReadFile(resourcePath)
-	if err != nil {
-		return nil, err
-	}
-	return resourceFromBytes(d)
-}
-
-func resourceFromBytes(bytes []byte) (*unstructured.Unstructured, error) {
-	resource := &unstructured.Unstructured{}
-	dec := serializer.NewDecodingSerializer(unstructured.UnstructuredJSONScheme)
-	_, _, err := dec.Decode(bytes, nil, resource)
-	if err != nil {
-		return nil, err
-	}
-
-	return resource, nil
 }
 
 func newTestAPIResourceList(apiVersion, name, kind string) *metav1.APIResourceList {

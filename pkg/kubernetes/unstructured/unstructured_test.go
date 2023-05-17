@@ -15,6 +15,8 @@ limitations under the License.
 package unstructured
 
 import (
+	"io/ioutil"
+	"path/filepath"
 	"testing"
 
 	util "github.com/keikoproj/kubedog/internal/utilities"
@@ -399,4 +401,27 @@ func Test_unstructuredResourceOperation(t *testing.T) {
 			}
 		})
 	}
+}
+
+// TODO: do not return error, receive t *testing.T and fail instead
+func resourceFromYaml(resourceFileName string) (*unstructured.Unstructured, error) {
+
+	resourcePath := filepath.Join("../../test/templates", resourceFileName)
+	d, err := ioutil.ReadFile(resourcePath)
+	if err != nil {
+		return nil, err
+	}
+	return resourceFromBytes(d)
+}
+
+// TODO: do not return error, receive t *testing.T and fail instead
+func resourceFromBytes(bytes []byte) (*unstructured.Unstructured, error) {
+	resource := &unstructured.Unstructured{}
+	dec := serializer.NewDecodingSerializer(unstructured.UnstructuredJSONScheme)
+	_, _, err := dec.Decode(bytes, nil, resource)
+	if err != nil {
+		return nil, err
+	}
+
+	return resource, nil
 }

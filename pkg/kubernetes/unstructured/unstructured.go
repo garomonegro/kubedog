@@ -60,17 +60,8 @@ func (w WaiterConfig) getTries() int {
 //kc.TemplateArguments
 
 // TODO: maybe make this its own pkg and have them take the client as input?
-func ResourceOperation(dynamicClient dynamic.Interface, dc discovery.DiscoveryInterface, operation, resourceFilePath string) error {
-	return ResourceOperationInNamespace(dynamicClient, dc, operation, resourceFilePath, "")
-}
-
-// TODO: use unstructuredResourceOperation directly, call parseSingleResource from kube.go
-func ResourceOperationInNamespace(dynamicClient dynamic.Interface, dc discovery.DiscoveryInterface, unstructuredResource util.K8sUnstructuredResource, operation, ns, resourceFilePath string) error {
-	unstructuredResource, err := getResource(dc, resourceFilePath)
-	if err != nil {
-		return err
-	}
-	return unstructuredResourceOperation(dynamicClient, operation, ns, unstructuredResource)
+func ResourceOperation(dynamicClient dynamic.Interface, unstructuredResource util.K8sUnstructuredResource, operation string) error {
+	return ResourceOperationInNamespace(dynamicClient, unstructuredResource, operation, "")
 }
 
 func getResource(dc discovery.DiscoveryInterface, TemplateArguments interface{}, resourceFilePath string) (util.K8sUnstructuredResource, error) {
@@ -96,39 +87,27 @@ func validateDynamicClient(dynamicClient dynamic.Interface) error {
 	return nil
 }
 
-func MultiResourceOperation(dynamicClient dynamic.Interface, dc discovery.DiscoveryInterface, operation, resourceFilePath string) error {
-	resourceList, err := getResources(dc, resourceFilePath)
-	if err != nil {
-		return err
-	}
-
-	for _, unstructuredResource := range resourceList {
-		err = unstructuredResourceOperation(dynamicClient, operation, "", unstructuredResource)
+func MultiResourceOperation(dynamicClient dynamic.Interface, unstructuredResources []util.K8sUnstructuredResource, operation string) error {
+	for _, unstructuredResource := range unstructuredResources {
+		err := ResourceOperationInNamespace(dynamicClient, unstructuredResource, operation, "")
 		if err != nil {
 			return err
 		}
 	}
-
 	return nil
 }
 
-func MultiResourceOperationInNamespace(dynamicClient dynamic.Interface, dc discovery.DiscoveryInterface, operation, resourceFilePath, ns string) error {
-	resourceList, err := getResources(dc, resourceFilePath)
-	if err != nil {
-		return err
-	}
-
-	for _, unstructuredResource := range resourceList {
-		err = unstructuredResourceOperation(dynamicClient, operation, ns, unstructuredResource)
+func MultiResourceOperationInNamespace(dynamicClient dynamic.Interface, unstructuredResources []util.K8sUnstructuredResource, operation, ns string) error {
+	for _, unstructuredResource := range unstructuredResources {
+		err := ResourceOperationInNamespace(dynamicClient, unstructuredResource, operation, ns)
 		if err != nil {
 			return err
 		}
 	}
-
 	return nil
 }
 
-func unstructuredResourceOperation(dynamicClient dynamic.Interface, operation, ns string, unstructuredResource util.K8sUnstructuredResource) error {
+func ResourceOperationInNamespace(dynamicClient dynamic.Interface, unstructuredResource util.K8sUnstructuredResource, operation, ns string) error {
 	if err := validateDynamicClient(dynamicClient); err != nil {
 		return err
 	}
@@ -179,22 +158,22 @@ func unstructuredResourceOperation(dynamicClient dynamic.Interface, operation, n
 	return nil
 }
 
-func ResourceOperationWithResult(dynamicClient dynamic.Interface, dc discovery.DiscoveryInterface, operation, resourceFilePath, expectedResult string) error {
-	return ResourceOperationWithResultInNamespace(dynamicClient, dc, operation, resourceFilePath, "", expectedResult)
+func ResourceOperationWithResult(dynamicClient dynamic.Interface, unstructuredResource util.K8sUnstructuredResource, operation, expectedResult string) error {
+	return ResourceOperationWithResultInNamespace(dynamicClient, unstructuredResource, operation, "", expectedResult)
 }
 
-func ResourceOperationWithResultInNamespace(dynamicClient dynamic.Interface, dc discovery.DiscoveryInterface, operation, resourceFilePath, namespace, expectedResult string) error {
+func ResourceOperationWithResultInNamespace(dynamicClient dynamic.Interface, unstructuredResource util.K8sUnstructuredResource, operation, namespace, expectedResult string) error {
 	var expectError = strings.EqualFold(expectedResult, "fail")
-	err := ResourceOperationInNamespace(dynamicClient, dc, operation, resourceFilePath, namespace)
+	err := ResourceOperationInNamespace(dynamicClient, unstructuredResource, operation, namespace)
 	if !expectError && err != nil {
-		return fmt.Errorf("unexpected error when '%s' '%s': '%s'", operation, resourceFilePath, err.Error())
+		return fmt.Errorf("unexpected error when '%s' '%s': '%s'", operation, unstructuredResource.Resource.GetName(), err.Error())
 	} else if expectError && err == nil {
-		return fmt.Errorf("expected error when '%s' '%s', but received none", operation, resourceFilePath)
+		return fmt.Errorf("expected error when '%s' '%s', but received none", operation, unstructuredResource.Resource.GetName())
 	}
 	return nil
 }
 
-func ResourceShouldBe(dynamicClient dynamic.Interface, dc discovery.DiscoveryInterface, w WaiterConfig, resourceFilePath, state string) error {
+func ResourceShouldBe(dynamicClient dynamic.Interface, unstructuredResource util.K8sUnstructuredResource, w WaiterConfig, state string) error {
 	var (
 		exists  bool
 		counter int
@@ -204,10 +183,6 @@ func ResourceShouldBe(dynamicClient dynamic.Interface, dc discovery.DiscoveryInt
 		return err
 	}
 
-	unstructuredResource, err := getResource(dc, resourceFilePath)
-	if err != nil {
-		return err
-	}
 	gvr, resource := unstructuredResource.GVR, unstructuredResource.Resource
 	for {
 		exists = true
@@ -242,7 +217,7 @@ func ResourceShouldBe(dynamicClient dynamic.Interface, dc discovery.DiscoveryInt
 	}
 }
 
-func ResourceShouldConvergeToSelector(dynamicClient dynamic.Interface, dc discovery.DiscoveryInterface, w WaiterConfig, resourceFilePath, selector string) error {
+func ResourceShouldConvergeToSelector(dynamicClient dynamic.Interface, unstructuredResource util.K8sUnstructuredResource, w WaiterConfig, selector string) error {
 	var counter int
 
 	if err := validateDynamicClient(dynamicClient); err != nil {
@@ -262,10 +237,6 @@ func ResourceShouldConvergeToSelector(dynamicClient dynamic.Interface, dc discov
 		return errors.Errorf("Found empty 'key' in selector '%s' of form '<key>=<value>'", selector)
 	}
 
-	unstructuredResource, err := getResource(dc, resourceFilePath)
-	if err != nil {
-		return err
-	}
 	gvr, resource := unstructuredResource.GVR, unstructuredResource.Resource
 
 	for {
@@ -294,7 +265,7 @@ func ResourceShouldConvergeToSelector(dynamicClient dynamic.Interface, dc discov
 	return nil
 }
 
-func ResourceConditionShouldBe(dynamicClient dynamic.Interface, dc discovery.DiscoveryInterface, w WaiterConfig, resourceFilePath, cType, status string) error {
+func ResourceConditionShouldBe(dynamicClient dynamic.Interface, unstructuredResource util.K8sUnstructuredResource, w WaiterConfig, cType, status string) error {
 	var (
 		counter        int
 		expectedStatus = cases.Title(language.English).String(status)
@@ -304,10 +275,6 @@ func ResourceConditionShouldBe(dynamicClient dynamic.Interface, dc discovery.Dis
 		return err
 	}
 
-	unstructuredResource, err := getResource(dc, resourceFilePath)
-	if err != nil {
-		return err
-	}
 	gvr, resource := unstructuredResource.GVR, unstructuredResource.Resource
 
 	for {
@@ -351,7 +318,7 @@ func ResourceConditionShouldBe(dynamicClient dynamic.Interface, dc discovery.Dis
 	}
 }
 
-func UpdateResourceWithField(dynamicClient dynamic.Interface, dc discovery.DiscoveryInterface, resourceFilePath, key string, value string) error {
+func UpdateResourceWithField(dynamicClient dynamic.Interface, unstructuredResource util.K8sUnstructuredResource, key string, value string) error {
 	var (
 		keySlice     = util.DeleteEmpty(strings.Split(key, "."))
 		overrideType bool
@@ -363,10 +330,6 @@ func UpdateResourceWithField(dynamicClient dynamic.Interface, dc discovery.Disco
 		return err
 	}
 
-	unstructuredResource, err := getResource(dc, resourceFilePath)
-	if err != nil {
-		return err
-	}
 	gvr, resource := unstructuredResource.GVR, unstructuredResource.Resource
 
 	n, err := strconv.ParseInt(value, 10, 64)
@@ -398,7 +361,9 @@ func UpdateResourceWithField(dynamicClient dynamic.Interface, dc discovery.Disco
 	return nil
 }
 
-func DeleteResourcesAtPath(dynamicClient dynamic.Interface, dc discovery.DiscoveryInterface, w WaiterConfig, resourcesPath string) error {
+// TODO: figure out what to do with this func. could break it down into deleteFn and waitFn and use them where this is called
+// TODO: this function has a bug, it would not delete properly files with multiple resources in them, see if using getResources instead of getResource would fix issue (not sure getResources can handle single files correctly)
+func DeleteResourcesAtPath(dynamicClient dynamic.Interface, dc discovery.DiscoveryInterface, TemplateArguments interface{}, w WaiterConfig, resourcesPath string) error {
 	if err := validateDynamicClient(dynamicClient); err != nil {
 		return err
 	}
@@ -412,7 +377,7 @@ func DeleteResourcesAtPath(dynamicClient dynamic.Interface, dc discovery.Discove
 			return nil
 		}
 
-		unstructuredResource, err := getResource(dc, path)
+		unstructuredResource, err := getResource(dc, TemplateArguments, path)
 		if err != nil {
 			return err
 		}
@@ -439,7 +404,7 @@ func DeleteResourcesAtPath(dynamicClient dynamic.Interface, dc discovery.Discove
 			return nil
 		}
 
-		unstructuredResource, err := getResource(dc, path)
+		unstructuredResource, err := getResource(dc, TemplateArguments, path)
 		if err != nil {
 			return err
 		}
@@ -472,3 +437,5 @@ func DeleteResourcesAtPath(dynamicClient dynamic.Interface, dc discovery.Discove
 
 	return nil
 }
+
+var deleteFn filepath.WalkFunc
