@@ -40,7 +40,7 @@ import (
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 )
 
-func (kc *Client) KubernetesClusterShouldBe(state string) error {
+func (kc *ClientSet) KubernetesClusterShouldBe(state string) error {
 	if err := kc.Validate(); err != nil {
 		return err
 	}
@@ -51,7 +51,7 @@ func (kc *Client) KubernetesClusterShouldBe(state string) error {
 		}
 		return nil
 	case stateDeleted:
-		if err := kc.KubernetesCluster(); err == nil {
+		if err := kc.DiscoverClients(); err == nil {
 			return errors.New("failed validating cluster delete, cluster is still available")
 		}
 		return nil
@@ -60,7 +60,7 @@ func (kc *Client) KubernetesClusterShouldBe(state string) error {
 	}
 }
 
-func (kc *Client) NodesWithSelectorShouldBe(n int, selector, state string) error {
+func (kc *ClientSet) NodesWithSelectorShouldBe(n int, selector, state string) error {
 	var (
 		counter int
 		found   bool
@@ -118,9 +118,9 @@ func (kc *Client) NodesWithSelectorShouldBe(n int, selector, state string) error
 	return nil
 }
 
-func (kc *Client) ScaleDeployment(name, ns string, replica int32) error {
-	if kc.KubeInterface == nil {
-		return errors.Errorf("'Client.KubeInterface' is nil. 'AKubernetesCluster' sets this interface, try calling it before using this method")
+func (kc *ClientSet) ScaleDeployment(name, ns string, replica int32) error {
+	if err := kc.Validate(); err != nil {
+		return err
 	}
 
 	scale := &autoscalingv1.Scale{
@@ -140,10 +140,10 @@ func (kc *Client) ScaleDeployment(name, ns string, replica int32) error {
 	return nil
 }
 
-func (kc *Client) ClusterRbacIsFound(resource, name string) error {
+func (kc *ClientSet) ClusterRbacIsFound(resource, name string) error {
 	var err error
-	if kc.KubeInterface == nil {
-		return errors.Errorf("'Client.KubeInterface' is nil. 'AKubernetesCluster' sets this interface, try calling it before using this method")
+	if err := kc.Validate(); err != nil {
+		return err
 	}
 
 	switch resource {
@@ -161,7 +161,7 @@ func (kc *Client) ClusterRbacIsFound(resource, name string) error {
 	return nil
 }
 
-func (kc *Client) GetNodes() error {
+func (kc *ClientSet) GetNodes() error {
 
 	var readyStatus = func(conditions []corev1.NodeCondition) string {
 		var status = false
@@ -197,7 +197,7 @@ func (kc *Client) GetNodes() error {
 }
 
 // TODO: export it and use it instead of ResourceIsRunning
-func (kc *Client) daemonsetIsRunning(dsName, namespace string) error {
+func (kc *ClientSet) daemonsetIsRunning(dsName, namespace string) error {
 	// TODO: implement this differently, remove gomega
 	gomega.Eventually(func() error {
 		ds, err := kc.GetDaemonset(dsName, namespace)
@@ -220,7 +220,7 @@ func (kc *Client) daemonsetIsRunning(dsName, namespace string) error {
 }
 
 // TODO: export it and use it instead of ResourceIsRunning
-func (kc *Client) deploymentIsRunning(deployName, namespace string) error {
+func (kc *ClientSet) deploymentIsRunning(deployName, namespace string) error {
 	deploy, err := kc.GetDeployment(deployName, namespace)
 	if err != nil {
 		return err
@@ -236,7 +236,7 @@ func (kc *Client) deploymentIsRunning(deployName, namespace string) error {
 	return nil
 }
 
-func (kc *Client) ResourceIsRunning(kind, name, namespace string) error {
+func (kc *ClientSet) ResourceIsRunning(kind, name, namespace string) error {
 	kind = strings.ToLower(kind)
 	switch kind {
 	case "daemonset":
@@ -248,7 +248,7 @@ func (kc *Client) ResourceIsRunning(kind, name, namespace string) error {
 	}
 }
 
-func (kc *Client) PersistentVolExists(volName, expectedPhase string) error {
+func (kc *ClientSet) PersistentVolExists(volName, expectedPhase string) error {
 	vol, err := kc.GetPersistentVolume(volName)
 	if err != nil {
 		return err
@@ -260,7 +260,7 @@ func (kc *Client) PersistentVolExists(volName, expectedPhase string) error {
 	return nil
 }
 
-func (kc *Client) VerifyInstanceGroups() error {
+func (kc *ClientSet) VerifyInstanceGroups() error {
 	igs, err := kc.ListInstanceGroups()
 	if err != nil {
 		return err
@@ -286,7 +286,7 @@ func getInstanceGroupStatus(instanceGroup *unstructured.Unstructured) string {
 	return ""
 }
 
-func (kc *Client) ValidatePrometheusVolumeClaimTemplatesName(statefulsetName string, namespace string, volumeClaimTemplatesName string) error {
+func (kc *ClientSet) ValidatePrometheusVolumeClaimTemplatesName(statefulsetName string, namespace string, volumeClaimTemplatesName string) error {
 	var sfsvolumeClaimTemplatesName string
 	// Prometheus StatefulSets deployed, then validate volumeClaimTemplate name.
 	// Validation required:
@@ -316,7 +316,7 @@ func (kc *Client) ValidatePrometheusVolumeClaimTemplatesName(statefulsetName str
 	return nil
 }
 
-func (kc *Client) validatePrometheusPVLabels(volumeClaimTemplatesName string) error {
+func (kc *ClientSet) validatePrometheusPVLabels(volumeClaimTemplatesName string) error {
 	// Get prometheus PersistentVolume list
 	pv, err := kc.ListPersistentVolumes()
 	if err != nil {
@@ -333,11 +333,11 @@ func (kc *Client) validatePrometheusPVLabels(volumeClaimTemplatesName string) er
 	return nil
 }
 
-func (kc *Client) SecretDelete(secretName, namespace string) error {
+func (kc *ClientSet) SecretDelete(secretName, namespace string) error {
 	return kc.SecretOperationFromEnvironmentVariable(operationDelete, secretName, namespace, "")
 }
 
-func (kc *Client) SecretOperationFromEnvironmentVariable(operation, secretName, namespace, environmentVariable string) error {
+func (kc *ClientSet) SecretOperationFromEnvironmentVariable(operation, secretName, namespace, environmentVariable string) error {
 	var (
 		secretValue string
 		ok          bool
@@ -391,7 +391,7 @@ func (kc *Client) SecretOperationFromEnvironmentVariable(operation, secretName, 
 	}
 }
 
-func (kc *Client) GetIngressEndpoint(name, namespace string, port int, path string) (string, error) {
+func (kc *ClientSet) GetIngressEndpoint(name, namespace string, port int, path string) (string, error) {
 	var (
 		counter int
 	)
@@ -424,7 +424,7 @@ func (kc *Client) GetIngressEndpoint(name, namespace string, port int, path stri
 	}
 }
 
-func (kc *Client) IngressAvailable(name, namespace string, port int, path string) error {
+func (kc *ClientSet) IngressAvailable(name, namespace string, port int, path string) error {
 	var (
 		counter int
 	)
@@ -459,7 +459,7 @@ func (kc *Client) IngressAvailable(name, namespace string, port int, path string
 	}
 }
 
-func (kc *Client) SendTrafficToIngress(tps int, name, namespace string, port int, path string, duration int, durationUnits string, expectedErrors int) error {
+func (kc *ClientSet) SendTrafficToIngress(tps int, name, namespace string, port int, path string, duration int, durationUnits string, expectedErrors int) error {
 	endpoint, err := kc.GetIngressEndpoint(name, namespace, port, path)
 	if err != nil {
 		return err
@@ -500,7 +500,7 @@ func init() {
 	gomega.RegisterFailHandler(ginkgo.Fail)
 }
 
-func (kc *Client) ResourceInNamespace(resource, name, ns string) error {
+func (kc *ClientSet) ResourceInNamespace(resource, name, ns string) error {
 	var err error
 
 	if err := kc.Validate(); err != nil {

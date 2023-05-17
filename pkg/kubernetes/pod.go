@@ -15,11 +15,11 @@ import (
 	"k8s.io/apimachinery/pkg/util/wait"
 )
 
-func (kc *Client) GetPods(namespace string) error {
+func (kc *ClientSet) GetPods(namespace string) error {
 	return kc.GetPodsWithSelector(namespace, "")
 }
 
-func (kc *Client) GetPodsWithSelector(namespace, selector string) error {
+func (kc *ClientSet) GetPodsWithSelector(namespace, selector string) error {
 	var readyCount = func(conditions []corev1.ContainerStatus) string {
 		var readyCount = 0
 		var containerCount = len(conditions)
@@ -47,7 +47,7 @@ func (kc *Client) GetPodsWithSelector(namespace, selector string) error {
 	return nil
 }
 
-func (kc *Client) PodsWithSelectorHaveRestartCountLessThan(namespace string, selector string, expectedRestartCountLessThan int) error {
+func (kc *ClientSet) PodsWithSelectorHaveRestartCountLessThan(namespace string, selector string, expectedRestartCountLessThan int) error {
 	pods, err := kc.ListPodsWithLabelSelector(namespace, selector)
 	if err != nil {
 		return err
@@ -71,7 +71,7 @@ func (kc *Client) PodsWithSelectorHaveRestartCountLessThan(namespace string, sel
 	return nil
 }
 
-func (kc *Client) SomeOrAllPodsInNamespaceWithSelectorHaveStringInLogsSinceTime(SomeOrAll, namespace, selector, searchkeyword, sinceTime string) error {
+func (kc *ClientSet) SomeOrAllPodsInNamespaceWithSelectorHaveStringInLogsSinceTime(SomeOrAll, namespace, selector, searchkeyword, sinceTime string) error {
 	expBackoff := &wait.Backoff{
 		Duration: 2 * time.Second,
 		Factor:   2.0,
@@ -129,7 +129,8 @@ func (kc *Client) SomeOrAllPodsInNamespaceWithSelectorHaveStringInLogsSinceTime(
 	})
 }
 
-func findStringInPodLogs(kc *Client, pod corev1.Pod, since time.Time, stringsToFind ...string) (int, error) {
+// TODO: why this takes the clientset instead of being a method?
+func findStringInPodLogs(kc *ClientSet, pod corev1.Pod, since time.Time, stringsToFind ...string) (int, error) {
 	var sinceTime metav1.Time = metav1.NewTime(since)
 	foundCount := 0
 	for _, container := range pod.Spec.Containers {
@@ -159,7 +160,7 @@ func findStringInPodLogs(kc *Client, pod corev1.Pod, since time.Time, stringsToF
 	return foundCount, nil
 }
 
-func (kc *Client) SomePodsInNamespaceWithSelectorDontHaveStringInLogsSinceTime(namespace, selector, searchkeyword, sinceTime string) error {
+func (kc *ClientSet) SomePodsInNamespaceWithSelectorDontHaveStringInLogsSinceTime(namespace, selector, searchkeyword, sinceTime string) error {
 	if err := kc.Validate(); err != nil {
 		return err
 	}
@@ -189,7 +190,7 @@ func (kc *Client) SomePodsInNamespaceWithSelectorDontHaveStringInLogsSinceTime(n
 	return fmt.Errorf("pod has '%s' message in the logs", searchkeyword)
 }
 
-func (kc *Client) PodsInNamespaceWithSelectorHaveNoErrorsInLogsSinceTime(namespace string, selector string, sinceTime string) error {
+func (kc *ClientSet) PodsInNamespaceWithSelectorHaveNoErrorsInLogsSinceTime(namespace string, selector string, sinceTime string) error {
 	if err := kc.Validate(); err != nil {
 		return err
 	}
@@ -221,7 +222,7 @@ func (kc *Client) PodsInNamespaceWithSelectorHaveNoErrorsInLogsSinceTime(namespa
 	return nil
 }
 
-func (kc *Client) PodsInNamespaceWithSelectorHaveSomeErrorsInLogsSinceTime(namespace string, selector string, sinceTime string) error {
+func (kc *ClientSet) PodsInNamespaceWithSelectorHaveSomeErrorsInLogsSinceTime(namespace string, selector string, sinceTime string) error {
 	err := kc.PodsInNamespaceWithSelectorHaveNoErrorsInLogsSinceTime(namespace, selector, sinceTime)
 	if err == nil {
 		return fmt.Errorf("logs found from selector %q in namespace %q have errors", selector, namespace)
@@ -229,7 +230,7 @@ func (kc *Client) PodsInNamespaceWithSelectorHaveSomeErrorsInLogsSinceTime(names
 	return nil
 }
 
-func (kc *Client) PodsInNamespaceShouldHaveLabels(podName string, namespace string, labels string) error {
+func (kc *ClientSet) PodsInNamespaceShouldHaveLabels(podName string, namespace string, labels string) error {
 
 	if err := kc.Validate(); err != nil {
 		return err
@@ -264,7 +265,7 @@ func (kc *Client) PodsInNamespaceShouldHaveLabels(podName string, namespace stri
 	return nil
 }
 
-func (kc *Client) PodsInNamespaceWithSelectorShouldHaveLabels(namespace string, selector string, labels string) error {
+func (kc *ClientSet) PodsInNamespaceWithSelectorShouldHaveLabels(namespace string, selector string, labels string) error {
 
 	if err := kc.Validate(); err != nil {
 		return err

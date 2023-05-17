@@ -20,11 +20,12 @@ import (
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 )
 
-func (kc *Client) ResourceOperation(operation, resourceFileName string) error {
+// TODO: maybe make this its own pkg and have them take the client as input?
+func (kc *ClientSet) ResourceOperation(operation, resourceFileName string) error {
 	return kc.ResourceOperationInNamespace(operation, resourceFileName, "")
 }
 
-func (kc *Client) ResourceOperationInNamespace(operation, resourceFileName, ns string) error {
+func (kc *ClientSet) ResourceOperationInNamespace(operation, resourceFileName, ns string) error {
 	unstructuredResource, err := kc.parseSingleResource(resourceFileName)
 	if err != nil {
 		return err
@@ -32,7 +33,7 @@ func (kc *Client) ResourceOperationInNamespace(operation, resourceFileName, ns s
 	return kc.unstructuredResourceOperation(operation, ns, unstructuredResource)
 }
 
-func (kc *Client) parseSingleResource(resourceFileName string) (util.K8sUnstructuredResource, error) {
+func (kc *ClientSet) parseSingleResource(resourceFileName string) (util.K8sUnstructuredResource, error) {
 	if err := kc.Validate(); err != nil {
 		return util.K8sUnstructuredResource{}, err
 	}
@@ -46,7 +47,7 @@ func (kc *Client) parseSingleResource(resourceFileName string) (util.K8sUnstruct
 	return unstructuredResource, nil
 }
 
-func (kc *Client) MultiResourceOperation(operation, resourceFileName string) error {
+func (kc *ClientSet) MultiResourceOperation(operation, resourceFileName string) error {
 	resourceList, err := kc.parseMultipleResources(resourceFileName)
 	if err != nil {
 		return err
@@ -62,7 +63,7 @@ func (kc *Client) MultiResourceOperation(operation, resourceFileName string) err
 	return nil
 }
 
-func (kc *Client) MultiResourceOperationInNamespace(operation, resourceFileName, ns string) error {
+func (kc *ClientSet) MultiResourceOperationInNamespace(operation, resourceFileName, ns string) error {
 	resourceList, err := kc.parseMultipleResources(resourceFileName)
 	if err != nil {
 		return err
@@ -78,7 +79,7 @@ func (kc *Client) MultiResourceOperationInNamespace(operation, resourceFileName,
 	return nil
 }
 
-func (kc *Client) parseMultipleResources(resourceFileName string) ([]util.K8sUnstructuredResource, error) {
+func (kc *ClientSet) parseMultipleResources(resourceFileName string) ([]util.K8sUnstructuredResource, error) {
 	if err := kc.Validate(); err != nil {
 		return nil, err
 	}
@@ -93,7 +94,7 @@ func (kc *Client) parseMultipleResources(resourceFileName string) ([]util.K8sUns
 	return resourceList, nil
 }
 
-func (kc *Client) unstructuredResourceOperation(operation, ns string, unstructuredResource util.K8sUnstructuredResource) error {
+func (kc *ClientSet) unstructuredResourceOperation(operation, ns string, unstructuredResource util.K8sUnstructuredResource) error {
 	gvr, resource := unstructuredResource.GVR, unstructuredResource.Resource
 
 	if ns == "" {
@@ -140,11 +141,11 @@ func (kc *Client) unstructuredResourceOperation(operation, ns string, unstructur
 	return nil
 }
 
-func (kc *Client) ResourceOperationWithResult(operation, resourceFileName, expectedResult string) error {
+func (kc *ClientSet) ResourceOperationWithResult(operation, resourceFileName, expectedResult string) error {
 	return kc.ResourceOperationWithResultInNamespace(operation, resourceFileName, "", expectedResult)
 }
 
-func (kc *Client) ResourceOperationWithResultInNamespace(operation, resourceFileName, namespace, expectedResult string) error {
+func (kc *ClientSet) ResourceOperationWithResultInNamespace(operation, resourceFileName, namespace, expectedResult string) error {
 	var expectError = strings.EqualFold(expectedResult, "fail")
 	err := kc.ResourceOperationInNamespace(operation, resourceFileName, namespace)
 	if !expectError && err != nil {
@@ -155,7 +156,7 @@ func (kc *Client) ResourceOperationWithResultInNamespace(operation, resourceFile
 	return nil
 }
 
-func (kc *Client) ResourceShouldBe(resourceFileName, state string) error {
+func (kc *ClientSet) ResourceShouldBe(resourceFileName, state string) error {
 	var (
 		exists  bool
 		counter int
@@ -205,7 +206,7 @@ func (kc *Client) ResourceShouldBe(resourceFileName, state string) error {
 	}
 }
 
-func (kc *Client) ResourceShouldConvergeToSelector(resourceFileName, selector string) error {
+func (kc *ClientSet) ResourceShouldConvergeToSelector(resourceFileName, selector string) error {
 	var counter int
 
 	if err := kc.Validate(); err != nil {
@@ -259,7 +260,7 @@ func (kc *Client) ResourceShouldConvergeToSelector(resourceFileName, selector st
 	return nil
 }
 
-func (kc *Client) ResourceConditionShouldBe(resourceFileName, cType, status string) error {
+func (kc *ClientSet) ResourceConditionShouldBe(resourceFileName, cType, status string) error {
 	var (
 		counter        int
 		expectedStatus = cases.Title(language.English).String(status)
@@ -317,7 +318,7 @@ func (kc *Client) ResourceConditionShouldBe(resourceFileName, cType, status stri
 	}
 }
 
-func (kc *Client) UpdateResourceWithField(resourceFileName, key string, value string) error {
+func (kc *ClientSet) UpdateResourceWithField(resourceFileName, key string, value string) error {
 	var (
 		keySlice     = util.DeleteEmpty(strings.Split(key, "."))
 		overrideType bool
@@ -366,10 +367,10 @@ func (kc *Client) UpdateResourceWithField(resourceFileName, key string, value st
 	return nil
 }
 
-func (kc *Client) DeleteResourcesAtPath(resourcesPath string) error {
+func (kc *ClientSet) DeleteResourcesAtPath(resourcesPath string) error {
 
 	// Getting context
-	err := kc.KubernetesCluster()
+	err := kc.DiscoverClients()
 	if err != nil {
 		return errors.Errorf("Failed getting the kubernetes client: %v", err)
 	}

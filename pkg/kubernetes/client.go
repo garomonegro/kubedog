@@ -26,7 +26,7 @@ const (
 	stateFound    = "found"
 )
 
-type Client struct {
+type ClientSet struct {
 	KubeInterface      kubernetes.Interface
 	DynamicInterface   dynamic.Interface
 	DiscoveryInterface discovery.DiscoveryInterface
@@ -37,22 +37,21 @@ type Client struct {
 	Timestamps         map[string]time.Time
 }
 
-func (kc *Client) Validate() error {
-	commonMessage := "'AKubernetesCluster' sets this interface, try calling it before using this method"
+func (kc *ClientSet) Validate() error {
+	commonMessage := "'DiscoverClients' sets this interface, try calling it before using this method"
 	if kc.DynamicInterface == nil {
-		return errors.Errorf("'Client.DynamicInterface' is nil. %s", commonMessage)
+		return errors.Errorf("'ClientSet.DynamicInterface' is nil. %s", commonMessage)
 	}
 	if kc.DiscoveryInterface == nil {
-		return errors.Errorf("'Client.DiscoveryInterface' is nil. %s", commonMessage)
+		return errors.Errorf("'ClientSet.DiscoveryInterface' is nil. %s", commonMessage)
 	}
 	if kc.KubeInterface == nil {
-		return errors.Errorf("'Client.KubeInterface' is nil. %s", commonMessage)
+		return errors.Errorf("'ClientSet.KubeInterface' is nil. %s", commonMessage)
 	}
 	return nil
 }
 
-// TODO: rename this method
-func (kc *Client) KubernetesCluster() error {
+func (kc *ClientSet) DiscoverClients() error {
 	var (
 		home, _        = os.UserHomeDir()
 		kubeconfigPath = filepath.Join(home, ".kube", "config")
@@ -98,7 +97,7 @@ func (kc *Client) KubernetesCluster() error {
 	return nil
 }
 
-func (kc *Client) SetTimestamp(timestampName string) error {
+func (kc *ClientSet) SetTimestamp(timestampName string) error {
 	if kc.Timestamps == nil {
 		kc.Timestamps = map[string]time.Time{}
 	}
@@ -108,18 +107,19 @@ func (kc *Client) SetTimestamp(timestampName string) error {
 	return nil
 }
 
-func (kc *Client) DeleteAllTestResources() error {
+// TODO: DeleteResourcesAtPath only used here, why have it as a separate method?
+func (kc *ClientSet) DeleteAllTestResources() error {
 	resourcesPath := kc.getTemplatesPath()
 
 	return kc.DeleteResourcesAtPath(resourcesPath)
 }
 
-func (kc *Client) getResourcePath(resourceFileName string) string {
+func (kc *ClientSet) getResourcePath(resourceFileName string) string {
 	templatesPath := kc.getTemplatesPath()
 	return filepath.Join(templatesPath, resourceFileName)
 }
 
-func (kc *Client) getTemplatesPath() string {
+func (kc *ClientSet) getTemplatesPath() string {
 	defaultFilePath := "templates"
 	if kc.FilesPath != "" {
 		return kc.FilesPath
@@ -127,7 +127,7 @@ func (kc *Client) getTemplatesPath() string {
 	return defaultFilePath
 }
 
-func (kc *Client) getWaiterInterval() time.Duration {
+func (kc *ClientSet) getWaiterInterval() time.Duration {
 	defaultWaiterInterval := time.Second * 30
 	if kc.WaiterInterval > 0 {
 		return kc.WaiterInterval
@@ -135,7 +135,7 @@ func (kc *Client) getWaiterInterval() time.Duration {
 	return defaultWaiterInterval
 }
 
-func (kc *Client) getWaiterTries() int {
+func (kc *ClientSet) getWaiterTries() int {
 	defaultWaiterTries := 40
 	if kc.WaiterTries > 0 {
 		return kc.WaiterTries

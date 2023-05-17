@@ -30,7 +30,7 @@ import (
 type Test struct {
 	suiteContext    *godog.TestSuiteContext
 	scenarioContext *godog.ScenarioContext
-	KubeContext     kube.Client
+	KubeContext     kube.ClientSet
 	AwsContext      aws.Client
 }
 
@@ -53,7 +53,7 @@ func (kdt *Test) Run() {
 	kdt.scenarioContext.Step(`^the (\S+) command is available$`, common.CommandExists)
 	kdt.scenarioContext.Step(`^I run the (\S+) command with the ([^"]*) args and the command (fails|succeeds)$`, common.RunCommand)
 	//syntax-generation:title:Kubernetes steps
-	kdt.scenarioContext.Step(`^((?:a )?Kubernetes cluster|(?:there are )?(?:valid )?Kubernetes Credentials)$`, kdt.KubeContext.KubernetesCluster)
+	kdt.scenarioContext.Step(`^((?:a )?Kubernetes cluster|(?:there are )?(?:valid )?Kubernetes Credentials)$`, kdt.KubeContext.DiscoverClients)
 	kdt.scenarioContext.Step(`^(?:I )?(create|submit|delete|update) (?:the )?resource (\S+)$`, kdt.KubeContext.ResourceOperation)
 	kdt.scenarioContext.Step(`^(?:I )?(create|submit|delete|update) (?:the )?resource (\S+) in (?:the )?([^"]*) namespace$`, kdt.KubeContext.ResourceOperationInNamespace)
 	kdt.scenarioContext.Step(`^(?:I )?(create|submit|delete|update) (?:the )?resources in (\S+)$`, kdt.KubeContext.MultiResourceOperation)
