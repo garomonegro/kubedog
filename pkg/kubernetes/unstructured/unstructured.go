@@ -315,7 +315,6 @@ func UpdateResourceWithField(dynamicClient dynamic.Interface, unstructuredResour
 	return nil
 }
 
-// TODO: figure out what to do with this func. could break it down into deleteFn and waitFn and use them where this is called
 // TODO: this function has a bug, it would not delete properly files with multiple resources in them, see if using getResources instead of getResource would fix issue (not sure getResources can handle single files correctly)
 func DeleteResourcesAtPath(dynamicClient dynamic.Interface, dc discovery.DiscoveryInterface, TemplateArguments interface{}, w common.WaiterConfig, resourcesPath string) error {
 	if err := validateDynamicClient(dynamicClient); err != nil {
@@ -388,7 +387,6 @@ func DeleteResourcesAtPath(dynamicClient dynamic.Interface, dc discovery.Discove
 	if err := filepath.Walk(resourcesPath, waitFn); err != nil {
 		return err
 	}
-
 	return nil
 }
 

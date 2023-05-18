@@ -21,7 +21,7 @@ func GetResource(dc discovery.DiscoveryInterface, TemplateArguments interface{},
 }
 
 func GetResources(dc discovery.DiscoveryInterface, TemplateArguments interface{}, resourcesFilePath string) ([]util.K8sUnstructuredResource, error) {
-	resourceList, err := util.GetMultipleResourcesFromYaml(resourcesFilePath, dc, TemplateArguments)
+	resourceList, err := util.GetResourcesFromYaml(resourcesFilePath, dc, TemplateArguments)
 	if err != nil {
 		return nil, err
 	}
