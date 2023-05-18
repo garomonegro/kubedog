@@ -12,7 +12,6 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-// Package common provides functions and steps implementations not specifically related to Kubernetes nor AWS.
 package generic
 
 import (
@@ -41,8 +40,6 @@ type TemplateArgument struct {
 	Default             string
 	Mandatory           bool
 }
-
-type condFunc func() (interface{}, error)
 
 var (
 	KubernetesClusterTagKey = "KubernetesCluster"
