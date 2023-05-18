@@ -35,7 +35,6 @@ import (
 	"k8s.io/client-go/kubernetes/fake"
 )
 
-// TODO: redistribute this test functions
 func TestPositiveNodesWithSelectorShouldBe(t *testing.T) {
 
 	var (

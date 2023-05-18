@@ -33,36 +33,12 @@ import (
 	kerrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
-	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/client-go/discovery"
 	"k8s.io/client-go/dynamic"
 )
 
 func ResourceOperation(dynamicClient dynamic.Interface, unstructuredResource util.K8sUnstructuredResource, operation string) error {
 	return ResourceOperationInNamespace(dynamicClient, unstructuredResource, operation, "")
-}
-
-func GetResource(dc discovery.DiscoveryInterface, TemplateArguments interface{}, resourceFilePath string) (util.K8sUnstructuredResource, error) {
-	unstructuredResource, err := util.GetResourceFromYaml(resourceFilePath, dc, TemplateArguments)
-	if err != nil {
-		return util.K8sUnstructuredResource{}, err
-	}
-	return unstructuredResource, nil
-}
-
-func GetResources(dc discovery.DiscoveryInterface, TemplateArguments interface{}, resourcesFilePath string) ([]util.K8sUnstructuredResource, error) {
-	resourceList, err := util.GetMultipleResourcesFromYaml(resourcesFilePath, dc, TemplateArguments)
-	if err != nil {
-		return nil, err
-	}
-	return resourceList, nil
-}
-
-func validateDynamicClient(dynamicClient dynamic.Interface) error {
-	if dynamicClient == nil {
-		return errors.Errorf("'k8s.io/client-go/dynamic.Interface' is nil.")
-	}
-	return nil
 }
 
 func MultiResourceOperation(dynamicClient dynamic.Interface, unstructuredResources []util.K8sUnstructuredResource, operation string) error {
@@ -436,32 +412,4 @@ func VerifyInstanceGroups(dynamicClient dynamic.Interface) error {
 	}
 
 	return nil
-}
-
-// TODO: delete function, use code directly in VerifyInstanceGroups
-// func getInstanceGroupStatus(instanceGroup *unstructured.Unstructured) string {
-// 	if val, ok, _ := unstructured.NestedString(instanceGroup.UnstructuredContent(), "status", "currentState"); ok {
-// 		return val
-// 	}
-// 	return ""
-// }
-
-// TODO: move this to a helper.go file? along with all functions that return anything but an error?
-func ListInstanceGroups(dynamicClient dynamic.Interface) (*unstructured.UnstructuredList, error) {
-	const (
-		instanceGroupNamespace   = "instance-manager"
-		customResourceGroup      = "instancemgr"
-		customResourceAPIVersion = "v1alpha1"
-		customeResourceDomain    = "keikoproj.io"
-		customResourceKind       = "instancegroups"
-	)
-	var (
-		customResourceName    = fmt.Sprintf("%v.%v", customResourceGroup, customeResourceDomain)
-		instanceGroupResource = schema.GroupVersionResource{Group: customResourceName, Version: customResourceAPIVersion, Resource: customResourceKind}
-	)
-	igs, err := dynamicClient.Resource(instanceGroupResource).Namespace(instanceGroupNamespace).List(context.Background(), metav1.ListOptions{})
-	if err != nil {
-		return nil, err
-	}
-	return igs, nil
 }
