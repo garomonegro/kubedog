@@ -37,7 +37,7 @@ const (
 	tittleRankStep           = "#"
 	processedTitleBeginning  = "## "
 	processedStepBeginning   = "- "
-	stepIndicator            = "kdt.scenarioContext.Step"
+	stepIndicator            = "kdt.scenario.Step"
 	stepDelimiter            = "`"
 	stepPrefix               = "^"
 	stepSuffix               = "$"
@@ -63,6 +63,7 @@ var replacers = []struct {
 }
 
 func main() {
+	log.SetLevel(log.DebugLevel)
 	sourceFile, err := os.Open(sourceFilePath)
 	if err != nil {
 		log.Error(err)
