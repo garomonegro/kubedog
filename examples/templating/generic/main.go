@@ -27,12 +27,10 @@ func main() {
 			Default:             "Hello, Kubedog!",
 		},
 	}
-
 	args, err := generic.TemplateArgumentsToMap(templateArguments...)
 	if err != nil {
 		log.Fatalln(err)
 	}
-
 	templatedFilePath := "templates/pod.yaml"
 	_, err = generic.GenerateFileFromTemplate(templatedFilePath, args)
 	if err != nil {
