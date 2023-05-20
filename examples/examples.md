@@ -22,7 +22,7 @@ To run the examples outside of the repository, you need to remove the replace di
 
 ## [templating/kube](templating/kube)
 
-The [kube](../pkg/kube) package has built in templating support, this example showcases that.
+The [kube](../pkg/kube) package has built-in templating support, this example showcases that.
 
 1. [templating/kube/features/deploy-pod.feature](templating/kube/features/deploy-pod.feature): same as [usage](#usage)
 2. [templating/kube/templates](templating/kube/templates): similar to [usage](#usage), but the files are **templated**
