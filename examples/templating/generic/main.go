@@ -7,7 +7,7 @@ import (
 )
 
 func main() {
-	TemplateArguments := []generic.TemplateArgument{
+	templateArguments := []generic.TemplateArgument{
 		{
 			Key:                 "Namespace",
 			EnvironmentVariable: "KUBEDOG_EXAMPLE_NAMESPACE",
@@ -28,13 +28,13 @@ func main() {
 		},
 	}
 
-	args, err := generic.TemplateArgumentsToMap(TemplateArguments...)
+	args, err := generic.TemplateArgumentsToMap(templateArguments...)
 	if err != nil {
 		log.Fatalln(err)
 	}
 
-	templatedInputConfigPath := "templates/pod.yaml"
-	_, err = generic.GenerateFileFromTemplate(templatedInputConfigPath, args)
+	templatedFilePath := "templates/pod.yaml"
+	_, err = generic.GenerateFileFromTemplate(templatedFilePath, args)
 	if err != nil {
 		log.Fatalln(err)
 	}
