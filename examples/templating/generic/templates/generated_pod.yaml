@@ -3,6 +3,8 @@ kind: Pod
 metadata:
   name: nginx-kubedog-example
   namespace: kubedog-example
+  labels:
+    tier: backend
 spec:
   containers:
   - name: hello

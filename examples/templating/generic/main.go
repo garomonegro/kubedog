@@ -15,6 +15,12 @@ func main() {
 			Default:             "kubedog-example",
 		},
 		{
+			Key:                 "Image",
+			EnvironmentVariable: "KUBEDOG_EXAMPLE_IMAGE",
+			Mandatory:           false,
+			Default:             "busybox:1.28",
+		},
+		{
 			Key:                 "Message",
 			EnvironmentVariable: "KUBEDOG_EXAMPLE_MESSAGE",
 			Mandatory:           false,
