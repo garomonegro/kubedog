@@ -39,7 +39,7 @@ import (
 // the input) then we use kube to use behavior-changing inputs to call different functions with specific behaviors or functions
 // in a different manner.
 
-// TODO: add a gif animation of how to use kubedog like some open source projects do
+// : add a gif animation of how to use kubedog like some open source projects do
 
 type ClientSet struct {
 	KubeInterface    kubernetes.Interface

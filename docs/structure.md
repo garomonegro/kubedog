@@ -6,6 +6,7 @@
 ├── coverage.txt
 ├── docs
 │   ├── examples.md
+│   ├── structure.md
 │   └── syntax.md
 ├── examples
 │   ├── templating
@@ -43,18 +44,15 @@
 │   └── util
 │       └── util.go
 ├── kubedog
-├── kubedog-design.md
 ├── kubedog.go
 └── pkg
     ├── aws
     │   ├── aws.go
     │   ├── aws_helper.go
-    │   ├── aws_helper_test.go
     │   ├── aws_test.go
     │   └── iam
     │       ├── iam.go
     │       ├── iam_helper.go
-    │       ├── iam_helper_test.go
     │       └── iam_test.go
     ├── generic
     │   ├── generic.go
@@ -96,7 +94,7 @@
             ├── unstructured_helper.go
             └── unstructured_test.go
 
-29 directories, 67 files
+29 directories, 65 files
 ```
 
 <!--
@@ -138,12 +136,10 @@ TODO: rename fila to contributing and add instructions on how to set local envir
 │   ├── aws
 │   │   ├── aws.go
 │   │   ├── aws_helper.go
-│   │   ├── aws_helper_test.go
 │   │   ├── aws_test.go
 │   │   └── iam
 │   │       ├── iam.go
 │   │       ├── iam_helper.go
-│   │       ├── iam_helper_test.go
 │   │       └── iam_test.go
 │   └── generic
 │       ├── generic.go
@@ -216,9 +212,9 @@ pkg/kube/unstructured
 └── unstructured_test.go
 ```
 
-`unstructured.go`: steps implementations only.
+`unstructured.go`: steps implementations.
 `unstructured_helper.go`: aids steps implementations and other non steps related implementations.
-`test`: test files used in `unstructured_test.go`.
+`test`: test files used in `*_test.go` if applicable.
 <!-- 
 TODO: how about kube_helper.go? maybe merge with kube.go or move non steps related implementations from kube.go to kube_helper.go
 -->
@@ -229,18 +225,12 @@ TODO: how about kube_helper.go? maybe merge with kube.go or move non steps relat
 pkg/aws
 ├── aws.go
 ├── aws_helper.go
-├── aws_helper_test.go
 ├── aws_test.go
 └── iam
     ├── iam.go
     ├── iam_helper.go
-    ├── iam_helper_test.go
     └── iam_test.go
 ```
-
-<!--
-TODO: move *_helper_test.go to *_test.go
--->
 
 ### generic
 
@@ -251,18 +241,6 @@ pkg/generic
 ├── template.go
 ├── template_test.go
 └── test
-    ├── generated_templated-bad-kind.yaml
-    ├── generated_templated.yaml
     ├── templated-bad-kind.yaml
     └── templated.yaml
-```
-
-<!--
-TODO: move generic.go and template.go to sub-packages (directories)
--->
-
-### util
-```
-internal/util
-└── util.go
 ```
